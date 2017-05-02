@@ -12,7 +12,7 @@ import utils.data as utld
 import utils.nn as nn
 
 
-dataset_path = 'path_to_file/mnist.pkl'
+dataset_path = 'data/mnist.pkl'
 
 
 def halt():

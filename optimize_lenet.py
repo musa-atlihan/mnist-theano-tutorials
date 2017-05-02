@@ -14,15 +14,16 @@ dataset_path = 'data/mnist.pkl'
 def halt():
     sys.exit(0)
 
-def optimize_mlp(learning_rate=0.01, L1_reg=0.00,
-                    L2_reg=0.0001, n_epochs=1000,
+def optimize_mlp(learning_rate=0.1, L1_reg=0.0000,
+                    L2_reg=0.0000, n_epochs=200,
                     dataset=dataset_path,
-                    batch_size=20, n_hidden=500):
-    """Optimize multilayer perceptron using mini-batch 
-    gradient descent.
+                    batch_size=500, n_hidden=500):
+    """
+    Optimize LeNet using mini-batch gradient descent.
+
     """
 
-    train_set, valid_set, test_set = utld.load_data(dataset_path)
+    train_set, valid_set, test_set = utld.load_data(dataset_path, reshape=True)
 
     train_set_x, train_set_y = train_set
     valid_set_x, valid_set_y = valid_set
@@ -35,17 +36,24 @@ def optimize_mlp(learning_rate=0.01, L1_reg=0.00,
     print('... building model')
 
     index = T.lscalar()
-    x = T.matrix('x')
+    x = T.tensor4('x')
     y = T.ivector('y')
 
     rng = np.random.RandomState(4321)
 
-    classifier = nn.MLP(
+    image_shape = (batch_size, 1, 28, 28)
+    filter_shapes = (
+        (20, 1, 5, 5),
+        (50, 20, 5, 5)
+    )
+
+    classifier = nn.LeNet(
         rng=rng,
         input=x,
-        n_in=28 * 28,
+        filter_shapes=filter_shapes,
         n_hidden=n_hidden,
-        n_out=10
+        n_out=10,
+        image_shape=image_shape
     )
     
     cost = (
@@ -81,7 +89,7 @@ def optimize_mlp(learning_rate=0.01, L1_reg=0.00,
 
     train_model = theano.function(
         inputs=[index],
-        outputs=cost,
+        outputs=[cost, classifier.errors(y)],
         updates=updates,
         givens={
             x: train_set_x[index * batch_size:(index + 1) * batch_size],
@@ -111,7 +119,7 @@ def optimize_mlp(learning_rate=0.01, L1_reg=0.00,
         epoch = epoch + 1
         for minibatch_index in range(n_train_batches):
 
-            minibatch_avg_cost = train_model(minibatch_index)
+            minibatch_avg_cost, this_train_loss = train_model(minibatch_index)
 
             iter = (epoch - 1) * n_train_batches + minibatch_index
 
@@ -120,6 +128,17 @@ def optimize_mlp(learning_rate=0.01, L1_reg=0.00,
                 validation_losses = [validate_model(i) for i
                                      in range(n_valid_batches)]
                 this_validation_loss = np.mean(validation_losses)
+
+                print(
+                    'epoch %i, iter %i minibatch %i/%i, train error %f %%' %
+                    (
+                        epoch,
+                        iter + 1,
+                        minibatch_index + 1,
+                        n_train_batches,
+                        this_train_loss * 100.
+                    )
+                )
 
                 print(
                     'epoch %i, minibatch %i/%i, validation error %f %%' %
@@ -145,7 +164,7 @@ def optimize_mlp(learning_rate=0.01, L1_reg=0.00,
                                        in range(n_test_batches)]
                         test_score = np.mean(test_losses)
 
-                        print(('     epoch %i, minibatch %i/%i, test error of '
+                        print(('    epoch %i, minibatch %i/%i, test error of '
                                'best model %f %%') %
                               (epoch, minibatch_index + 1, n_train_batches,
                                test_score * 100.))
@@ -158,7 +177,7 @@ def optimize_mlp(learning_rate=0.01, L1_reg=0.00,
     print(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
-    print(('ran for %.2fm' % ((end_time - start_time) / 60.)))
+    print(('ran for %.2fh' % ((end_time - start_time) / 3600.)))
 
 
 if __name__ == '__main__':

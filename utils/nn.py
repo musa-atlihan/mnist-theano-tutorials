@@ -5,6 +5,8 @@ except:
 import numpy as np
 import theano
 import theano.tensor as T
+from theano.tensor.nnet import conv2d
+from theano.tensor.signal import pool
 
 
 class LogisticRegression(object):
@@ -216,42 +218,53 @@ class ConvLayer(object):
 class LeNet(object):
     """Convolutional neural network from LeNet family."""
 
-    def __init__(self, rng, input, filter_shapes, n_hidden, image_shape=None):
-
-        conv_input = input
+    def __init__(self, rng, input, filter_shapes, n_hidden, n_out, image_shape=None):
 
         self.layer3 = ConvLayer(
             rng=rng,
-            input=conv_input,
+            input=input,
             filter_shape=filter_shapes[0],
             image_shape=image_shape,
             down_pooling=True,
-            activation=T.nnet.relu
+            activation=T.tanh
+        )
+
+        image_shape2 = (
+            image_shape[0],
+            filter_shapes[0][0],
+            (image_shape[2] - filter_shapes[0][2] + 1) // 2,
+            (image_shape[3] - filter_shapes[0][3] + 1) // 2
         )
 
         self.layer2 = ConvLayer(
             rng=rng,
             input=self.layer3.output,
             filter_shape=filter_shapes[1],
-            image_shape=image_shape,
+            image_shape=image_shape2,
             down_pooling=True,
-            activation=T.nnet.relu
+            activation=T.tanh
         )
 
         layer1_input = self.layer2.output.flatten(2)
+        
+        n_layer1_in = (
+            filter_shapes[1][0] 
+            * ((image_shape2[2] - filter_shapes[1][2] + 1) // 2)
+            * ((image_shape2[3] - filter_shapes[1][3] + 1) // 2)
+        )
 
         self.layer1 = HiddenLayer(
             rng=rng,
             input=layer1_input,
-            n_in=100,
+            n_in=n_layer1_in,
             n_out=n_hidden,
-            activation=T.nnet.relu
+            activation=T.tanh
         )
 
         self.layer0 = LogisticRegression(
             input=self.layer1.output,
             n_in=n_hidden,
-            n_out=2
+            n_out=n_out
         )
 
         self.L1 = (
